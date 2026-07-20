@@ -21,22 +21,24 @@ curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/in
 The script:
 1. Installs `@earendil-works/pi-coding-agent` via npm if `pi` isn't on PATH.
 2. Prompts for the HD proxy API key (or reads `HD_PROXY_KEY` env var).
-3. Prompts for **default model**, **theme**, **thinking level** (or reads
-   `PI_DEFAULT_MODEL` / `PI_THEME` / `PI_THINKING` env vars; defaults apply
-   when stdin isn't a TTY).
+3. Prompts for **proxy base URL**, **theme**, **thinking level** (or reads
+   `HD_PROXY_URL` / `PI_THEME` / `PI_THINKING` env vars; defaults apply when
+   stdin isn't a TTY). The default model is intentionally left untouched —
+   pick it yourself via `/model` or `/settings` after first run.
 4. Copies `models.json`, `settings.json`, `agents/`, `extensions/`, `AGENTS.md`
-   into `~/.pi/agent/`, patching `settings.json` with your choices.
-5. Persists `export HD_PROXY_KEY="..."` to `~/.zshrc` and `~/.bashrc`.
-6. Verifies with a live call to your chosen default model.
+   into `~/.pi/agent/`, patching `settings.json` with your theme/thinking.
+5. Persists `export HD_PROXY_KEY=...` and `export HD_PROXY_URL=...` to
+   `~/.zshrc` and `~/.bashrc`.
+6. Verifies with a live call to `glm-5.2` (cheapest).
 
 Non-interactive (all defaults):
 ```bash
 HD_PROXY_KEY=... curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/install.sh | bash
 ```
 
-Non-interactive (specific defaults):
+Non-interactive (specific options):
 ```bash
-HD_PROXY_KEY=... PI_DEFAULT_MODEL=gpt-5.6-sol PI_THEME=dark PI_THINKING=high \
+HD_PROXY_KEY=... HD_PROXY_URL=https://my.proxy PI_THEME=dark PI_THINKING=high \
   bash install.sh
 ```
 
@@ -71,7 +73,6 @@ Default: `hd-claude` / `claude-sonnet-5` (override in `settings.json`).
 |---|---|---|
 | `HD_PROXY_KEY` | yes | Proxy API key (set by install.sh) |
 | `HD_PROXY_URL` | no | Proxy base URL (default `https://proxy.tuongnguyen.work`, set by install.sh) |
-| `PI_DEFAULT_MODEL` | no | Default model id (interactive prompt otherwise) |
 | `PI_THEME` | no | `dark` / `light` (interactive prompt otherwise) |
 | `PI_THINKING` | no | Default thinking level (interactive prompt otherwise) |
 | `PI_PAINTER_MODEL` | no | Override `gpt-image-2` |

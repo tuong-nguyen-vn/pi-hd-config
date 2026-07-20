@@ -52,36 +52,8 @@ get_key() {
 KEY="$(get_key)"
 
 # --- 2b. Personalize (interactive only — skip if env vars pre-set) ------------
-# Each can be pre-set via env to keep install fully non-interactive.
+# Default model is intentionally NOT prompted — user picks via /model or /settings.
 is_tty() { [ -t 0 ] && [ -t 1 ]; }
-
-pick_default_model() {
-  [ -n "${PI_DEFAULT_MODEL:-}" ] && { echo "$PI_DEFAULT_MODEL"; return; }
-  is_tty || { echo "claude-sonnet-5"; return; }
-  cat <<'EOF'
-
-Pick a default model (provider/model):
-  1) claude-sonnet-5       (hd-claude, recommended)
-  2) glm-5.2               (hd-claude, cheapest)
-  3) claude-opus-4-8       (hd-claude, strongest)
-  4) gpt-5.6-sol           (hd-openai)
-  5) gpt-5.5               (hd-openai)
-  6) grok-4.5              (hd-openai)
-  7) gemini-3-flash-agent  (hd-gemini)
-EOF
-  local choice
-  read -rp "Choice [1]: " choice
-  case "${choice:-1}" in
-    1) echo "claude-sonnet-5" ;;
-    2) echo "glm-5.2" ;;
-    3) echo "claude-opus-4-8" ;;
-    4) echo "gpt-5.6-sol" ;;
-    5) echo "gpt-5.5" ;;
-    6) echo "grok-4.5" ;;
-    7) echo "gemini-3-flash-agent" ;;
-    *) echo "claude-sonnet-5" ;;
-  esac
-}
 
 pick_theme() {
   [ -n "${PI_THEME:-}" ] && { echo "$PI_THEME"; return; }
@@ -99,7 +71,6 @@ pick_thinking() {
   case "${choice:-3}" in 1) echo "off" ;; 2) echo "low" ;; 4) echo "high" ;; *) echo "medium" ;; esac
 }
 
-DEFAULT_MODEL="$(pick_default_model)"
 THEME="$(pick_theme)"
 THINKING="$(pick_thinking)"
 
@@ -116,17 +87,6 @@ pick_proxy_url() {
 PROXY_URL="$(pick_proxy_url)"
 DEFAULT_PROXY_URL="https://proxy.tuongnguyen.work"
 
-# Map model id → provider (settings.json needs both defaultProvider & defaultModel)
-provider_for_model() {
-  case "$1" in
-    claude-*|glm-*) echo "hd-claude" ;;
-    gpt-*|grok-*)   echo "hd-openai" ;;
-    gemini-*)       echo "hd-gemini" ;;
-    *)              echo "hd-claude" ;;
-  esac
-}
-DEFAULT_PROVIDER="$(provider_for_model "$DEFAULT_MODEL")"
-
 # --- 3. Prepare target dirs ---------------------------------------------------
 mkdir -p "$PI_DIR"/{agents,extensions/subagent,prompts,sessions}
 
@@ -140,18 +100,16 @@ cp "$REPO_DIR/extensions/painter.ts"    "$PI_DIR/extensions/"
 cp "$REPO_DIR/extensions/view-media.ts" "$PI_DIR/extensions/"
 cp "$REPO_DIR/extensions/subagent/"*    "$PI_DIR/extensions/subagent/"
 
-# Apply interactive choices to settings.json
-python3 - "$PI_DIR/settings.json" "$DEFAULT_PROVIDER" "$DEFAULT_MODEL" "$THEME" "$THINKING" <<'PY'
+# Apply interactive choices (theme + thinking only; default model left for user to pick via /model)
+python3 - "$PI_DIR/settings.json" "$THEME" "$THINKING" <<'PY'
 import json, sys
-path, prov, model, theme, thinking = sys.argv[1:6]
+path, theme, thinking = sys.argv[1:4]
 d = json.load(open(path))
-d["defaultProvider"]      = prov
-d["defaultModel"]         = model
 d["theme"]                = theme
 d["defaultThinkingLevel"] = thinking
 json.dump(d, open(path, "w"), indent=2, ensure_ascii=False)
 PY
-ok "Defaults: $DEFAULT_PROVIDER/$DEFAULT_MODEL · theme=$THEME · thinking=$THINKING"
+ok "Theme=$THEME · thinking=$THINKING · default model left untouched (use /model to pick)"
 
 # Patch models.json + extensions with chosen proxy URL
 if [ "$PROXY_URL" != "$DEFAULT_PROXY_URL" ]; then
@@ -198,8 +156,10 @@ info "Fetching pi-default-tools package..."
 pi update pi-default-tools >/dev/null 2>&1 || pi update >/dev/null 2>&1 || true
 
 # --- 7. Verify ----------------------------------------------------------------
-info "Verifying: calling $DEFAULT_MODEL via $DEFAULT_PROVIDER..."
-if pi -p --provider "$DEFAULT_PROVIDER" --model "$DEFAULT_MODEL" --no-tools --thinking off "reply with exactly: ok" 2>&1 | tail -3 | grep -q "ok"; then
+# Verify with the cheapest chat model (glm-5.2 via hd-claude), not the user's
+# default — install only confirms the proxy + key work end-to-end.
+info "Verifying: calling glm-5.2 via hd-claude..."
+if pi -p --provider hd-claude --model glm-5.2 --no-tools --thinking off "reply with exactly: ok" 2>&1 | tail -3 | grep -q "ok"; then
   ok "Install successful."
   echo
   echo "  Next: $(c_cyan 'source ~/.zshrc')  (or open a new shell)"
