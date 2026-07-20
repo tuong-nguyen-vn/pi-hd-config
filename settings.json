@@ -1,0 +1,16 @@
+{
+  "defaultProvider": "hd-claude",
+  "defaultModel": "claude-sonnet-5",
+  "defaultThinkingLevel": "medium",
+  "theme": "dark",
+  "packages": [
+    "git:github.com/jwu/pi-default-tools"
+  ],
+  "tools": [
+    "...",
+    "grep",
+    "find",
+    "ls"
+  ],
+  "hideThinkingBlock": true
+}

@@ -1,0 +1,15 @@
+# Sensitive / user-local — never commit
+auth.json
+trust.json
+models-store.json
+models.json.bak
+sessions/
+bin/
+git/
+node_modules/
+*.log
+.DS_Store
+
+# Local install state (don't ship keys written by testing)
+.env
+.env.*
