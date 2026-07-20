@@ -31,21 +31,28 @@ curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/in
 
 The script:
 1. Installs `@earendil-works/pi-coding-agent` via npm if `pi` isn't on PATH.
-2. Prompts for **HD_PROXY_KEY** (used by `painter` + `view_media`) — or reads
-   the env var.
-3. Prompts for **HD_PROXY_URL** (default `https://proxy.tuongnguyen.work`) —
-   or reads the env var.
+2. Asks for **painter base URL + API key** (defaults: `https://proxy.tuongnguyen.work/v1`
+   + your input).
+3. Asks for **view-media base URL + API key** — Enter accepts the painter
+   values, or paste different ones if you use a separate provider for vision.
 4. Copies extensions, agents, and `AGENTS.md` into `~/.pi/agent/`.
 5. `pi install git:github.com/jwu/pi-default-tools` (skipped if present).
-6. Persists `HD_PROXY_KEY` + `HD_PROXY_URL` to `~/.zshrc` / `~/.bashrc`.
+6. Persists `PI_PAINTER_BASE` / `PI_PAINTER_KEY` / `PI_VISION_BASE` /
+   `PI_VISION_KEY` to `~/.zshrc` / `~/.bashrc`.
 
-That's the entire input set — no theme/thinking/model prompts. Those are
-personal prefs you set via `/settings` and `/model` inside Pi.
+Painter and view_media are fully independent — they can hit two different
+proxies/providers if you want.
 
-Non-interactive:
+Non-interactive (use same proxy for both):
 ```bash
-HD_PROXY_KEY=... HD_PROXY_URL=https://my.proxy \
-  curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/install.sh | bash
+PI_PAINTER_KEY=... curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/install.sh | bash
+```
+
+Non-interactive (separate providers per tool):
+```bash
+PI_PAINTER_BASE=https://img-proxy.example.com/v1 PI_PAINTER_KEY=... \
+PI_VISION_BASE=https://vision-proxy.example.com/v1  PI_VISION_KEY=... \
+  bash install.sh
 ```
 
 Or from a clone:
@@ -58,12 +65,16 @@ cd pi-hd-config && ./install.sh
 
 | Var | Required | Purpose |
 |---|---|---|
-| `HD_PROXY_KEY` | yes (for painter/view_media) | Proxy API key — set by install.sh |
-| `HD_PROXY_URL` | no | Proxy base URL (default `https://proxy.tuongnguyen.work`) — set by install.sh |
+| `PI_PAINTER_KEY` | yes (painter) | Painter proxy API key — set by install.sh |
+| `PI_PAINTER_BASE` | no | Painter base URL (default `https://proxy.tuongnguyen.work/v1`) |
+| `PI_VISION_KEY` | yes (view_media) | View-media proxy API key — defaults to `PI_PAINTER_KEY` |
+| `PI_VISION_BASE` | no | View-media base URL — defaults to `PI_PAINTER_BASE` |
 | `PI_PAINTER_MODEL` | no | Override `gpt-image-2` |
-| `PI_PAINTER_BASE` | no | Override painter API base URL |
 | `PI_VISION_MODEL` | no | Override `gemini-3-flash-agent` fallback |
-| `PI_VISION_BASE` | no | Override vision API base URL |
+
+> Legacy `HD_PROXY_KEY` / `HD_PROXY_URL` still work as a fallback in the
+> extensions (back-compat with older installs) but the installer no longer
+> sets them.
 
 ## Uninstall
 
@@ -99,6 +110,7 @@ pi remove git:github.com/jwu/pi-default-tools
 
 ## Security
 
-No API keys committed. Extensions read `process.env.HD_PROXY_KEY`; the
-installer writes the key only to `~/.zshrc` / `~/.bashrc` (consider
-`chmod 600 ~/.zshrc`).
+No API keys committed. Extensions read `process.env.PI_PAINTER_KEY` /
+`process.env.PI_VISION_KEY` (and base URLs from `PI_PAINTER_BASE` /
+`PI_VISION_BASE`). The installer writes these only to `~/.zshrc` /
+`~/.bashrc` (consider `chmod 600 ~/.zshrc`).
