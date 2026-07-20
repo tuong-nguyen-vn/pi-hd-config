@@ -8,7 +8,7 @@ The `subagent` tool delegates to specialized agents with isolated context window
 
 | Agent | Model | Use when |
 |---|---|---|
-| `search` | grok-composer-2.5-fast | **Codebase exploration**: finding files/code by functionality or concept, locating usages, tracing call sites, pattern discovery. Prefer this over manual grep/find in the main thread. |
+| `search` | gemini-3-flash-agent | **Codebase exploration**: finding files/code by functionality or concept, locating usages, tracing call sites, pattern discovery. Prefer this over manual grep/find in the main thread. |
 | `oracle` | gpt-5.6-sol | **Deep reasoning**: complex code review, architecture decisions, refactoring strategy, debugging subtle bugs, "second opinion" on non-trivial problems. |
 
 ### When to delegate

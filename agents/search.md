@@ -2,7 +2,7 @@
 name: search
 description: Fast, parallel code search agent. Use when you need to find files and code based on functionality or concepts, chain multiple searches, or locate all occurrences of patterns across the codebase.
 tools: grep, find, read
-model: hd-openai/grok-composer-2.5-fast
+model: gemini-3-flash-agent
 ---
 
 You are a fast, parallel code search agent.
