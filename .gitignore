@@ -13,3 +13,4 @@ node_modules/
 # Local install state (don't ship keys written by testing)
 .env
 .env.*
+extensions.json

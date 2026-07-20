@@ -11,11 +11,13 @@ to manage** — this installer only handles the tooling layer.
 | Extensions | `painter` (image gen/edit), `view_media` (vision), `subagent` | `~/.pi/agent/extensions/` |
 | Agents | `oracle` (deep reasoning, `gpt-5.6-sol`), `search` (parallel code search, `gemini-3-flash-agent`) | `~/.pi/agent/agents/` |
 | System prompt | `AGENTS.md` wiring subagent delegation | `~/.pi/agent/AGENTS.md` |
+| Theme | `amp` — minimal Amp-like palette (grayscale + coral accent, no tool-bg fills) | `~/.pi/agent/themes/` |
 | Package | `pi-default-tools` (via `pi install`) | settings.json `packages` + `~/.pi/agent/git/` |
 
 **Not touched** by the installer (you manage these):
 - `models.json` (providers, API keys, model definitions)
 - `settings.json` (default model, theme, thinking level, …)
+- Shell rc files (`~/.zshrc`, `~/.bashrc`)
 
 A sample `models.json` + `settings.json` live in this repo for reference —
 copy them manually if you want a starting point:
@@ -35,10 +37,17 @@ The script:
    + your input).
 3. Asks for **view-media base URL + API key** — Enter accepts the painter
    values, or paste different ones if you use a separate provider for vision.
-4. Copies extensions, agents, and `AGENTS.md` into `~/.pi/agent/`.
+4. Copies extensions, agents, `AGENTS.md`, and `themes/` into `~/.pi/agent/`.
 5. `pi install git:github.com/jwu/pi-default-tools` (skipped if present).
-6. Persists `PI_PAINTER_BASE` / `PI_PAINTER_KEY` / `PI_VISION_BASE` /
-   `PI_VISION_KEY` to `~/.zshrc` / `~/.bashrc`.
+6. Writes `~/.pi/agent/extensions.json` (chmod 600) with painter/view-media
+   base URLs + API keys. **Does not touch your shell rc.**
+
+To enable the `amp` theme, set `"theme": "amp"` in `~/.pi/agent/settings.json`
+(the sample `settings.json` in this repo already does). Pi hot-reloads theme
+edits — tweak `~/.pi/agent/themes/amp.json` and see changes immediately.
+
+Extensions read `~/.pi/agent/extensions.json` first, then fall back to env
+vars (`PI_PAINTER_*` / `PI_VISION_*`) for back-compat.
 
 Painter and view_media are fully independent — they can hit two different
 proxies/providers if you want.
@@ -61,20 +70,30 @@ git clone https://github.com/tuong-nguyen-vn/pi-hd-config.git
 cd pi-hd-config && ./install.sh
 ```
 
-## Environment variables
+## Configuration
 
-| Var | Required | Purpose |
-|---|---|---|
-| `PI_PAINTER_KEY` | yes (painter) | Painter proxy API key — set by install.sh |
-| `PI_PAINTER_BASE` | no | Painter base URL (default `https://proxy.tuongnguyen.work/v1`) |
-| `PI_VISION_KEY` | yes (view_media) | View-media proxy API key — defaults to `PI_PAINTER_KEY` |
-| `PI_VISION_BASE` | no | View-media base URL — defaults to `PI_PAINTER_BASE` |
-| `PI_PAINTER_MODEL` | no | Override `gpt-image-2` |
-| `PI_VISION_MODEL` | no | Override `gemini-3-flash-agent` fallback |
+Painter and view-media keys live in `~/.pi/agent/extensions.json` (written by
+`install.sh`, chmod 600). The installer never touches your shell rc.
 
-> Legacy `HD_PROXY_KEY` / `HD_PROXY_URL` still work as a fallback in the
-> extensions (back-compat with older installs) but the installer no longer
-> sets them.
+```json
+{
+  "painter":   { "baseUrl": "https://proxy.tuongnguyen.work/v1", "apiKey": "..." },
+  "viewMedia": { "baseUrl": "https://proxy.tuongnguyen.work/v1", "apiKey": "..." }
+}
+```
+
+Optional model overrides: add `"model": "..."` to either section.
+
+| Env var (fallback) | Purpose |
+|---|---|
+| `PI_PAINTER_KEY` | Painter API key (if extensions.json absent) |
+| `PI_PAINTER_BASE` | Painter base URL |
+| `PI_PAINTER_MODEL` | Override `gpt-image-2` |
+| `PI_VISION_KEY` | View-media API key |
+| `PI_VISION_BASE` | View-media base URL |
+| `PI_VISION_MODEL` | Override `gemini-3-flash-agent` |
+
+> Legacy `HD_PROXY_KEY` / `HD_PROXY_URL` still work as a last-resort fallback.
 
 ## Uninstall
 
@@ -105,12 +124,14 @@ pi remove git:github.com/jwu/pi-default-tools
 │   ├── painter.ts
 │   ├── view-media.ts
 │   └── subagent/
+├── themes/
+│   └── amp.json         # minimal Amp-like palette (grayscale + coral accent)
 └── prompts/             # empty — add your own
 ```
 
 ## Security
 
-No API keys committed. Extensions read `process.env.PI_PAINTER_KEY` /
-`process.env.PI_VISION_KEY` (and base URLs from `PI_PAINTER_BASE` /
-`PI_VISION_BASE`). The installer writes these only to `~/.zshrc` /
-`~/.bashrc` (consider `chmod 600 ~/.zshrc`).
+No API keys committed. The installer writes painter/view-media keys only to
+`~/.pi/agent/extensions.json` with `chmod 600`. Extensions read that file
+first, then fall back to `PI_PAINTER_*` / `PI_VISION_*` env vars (legacy
+`HD_PROXY_*` as last resort). The installer never touches your shell rc.

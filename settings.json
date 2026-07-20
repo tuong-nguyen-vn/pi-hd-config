@@ -2,7 +2,7 @@
   "defaultProvider": "hd-claude",
   "defaultModel": "claude-sonnet-5",
   "defaultThinkingLevel": "medium",
-  "theme": "dark",
+  "theme": "amp",
   "packages": [
     "git:github.com/jwu/pi-default-tools"
   ],

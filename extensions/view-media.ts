@@ -8,22 +8,33 @@
  *    fallback (default: gemini-3-flash-agent via the OpenAI-compatible proxy)
  *    and returns its description as text alongside the inline image.
  *
- * Configure via env:
- *   HD_PROXY_KEY     (required) — proxy API key
- *   HD_PROXY_URL     (optional, default https://proxy.tuongnguyen.work) — proxy base
- *   PI_VISION_MODEL  (optional, default gemini-3-flash-agent)
- *   PI_VISION_BASE   (optional, overrides HD_PROXY_URL)
- *   PI_VISION_KEY    (optional, overrides HD_PROXY_KEY)
+ * Configure via ~/.pi/agent/extensions.json (preferred):
+ *   { "viewMedia": { "baseUrl": "...", "apiKey": "...", "model": "..." } }
+ *
+ * Or via env (fallback): PI_VISION_BASE / PI_VISION_KEY / PI_VISION_MODEL
+ * (legacy: HD_PROXY_URL / HD_PROXY_KEY).
  */
 
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { homedir } from "node:os";
+import { join, basename } from "node:path";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
 const DEFAULT_BASE = "https://proxy.tuongnguyen.work/v1";
 const DEFAULT_MODEL = "gemini-3-flash-agent";
+
+async function loadExtConfig(section: string): Promise<Record<string, string>> {
+  try {
+    const raw = await readFile(join(homedir(), ".pi", "agent", "extensions.json"), "utf-8");
+    const parsed = JSON.parse(raw);
+    const v = parsed?.[section];
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
 
 const IMAGE_EXT: Record<string, string> = {
   png: "image/png",
@@ -48,11 +59,12 @@ async function describeWithVision(
   mimeType: string,
   question: string,
   signal: AbortSignal | undefined,
-): Promise<string> {
-  const base = process.env.PI_VISION_BASE ?? process.env.HD_PROXY_URL ?? DEFAULT_BASE;
-  const key = process.env.PI_VISION_KEY ?? process.env.HD_PROXY_KEY;
-  if (!key) throw new Error("view_media: HD_PROXY_KEY env var not set");
-  const model = process.env.PI_VISION_MODEL ?? DEFAULT_MODEL;
+): Promise<{ description: string; model: string }> {
+  const cfg = await loadExtConfig("viewMedia");
+  const base = cfg.baseUrl || process.env.PI_VISION_BASE || process.env.HD_PROXY_URL || DEFAULT_BASE;
+  const key = cfg.apiKey || process.env.PI_VISION_KEY || process.env.HD_PROXY_KEY;
+  if (!key) throw new Error("view_media: no API key — set viewMedia.apiKey in ~/.pi/agent/extensions.json or PI_VISION_KEY env");
+  const model = cfg.model || process.env.PI_VISION_MODEL || DEFAULT_MODEL;
   const prompt =
     question?.trim() ||
     "Describe this image concisely: key objects, text (OCR), colors, layout. Be factual and specific.";
@@ -86,14 +98,14 @@ async function describeWithVision(
 
   const data: any = await resp.json();
   const content = data?.choices?.[0]?.message?.content;
-  if (Array.isArray(content)) {
-    return content
-      .map((c: any) => (typeof c === "string" ? c : c?.text ?? ""))
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-  }
-  return (typeof content === "string" ? content : "").trim();
+  const description = Array.isArray(content)
+    ? content
+        .map((c: any) => (typeof c === "string" ? c : c?.text ?? ""))
+        .filter(Boolean)
+        .join("\n")
+        .trim()
+    : (typeof content === "string" ? content : "").trim();
+  return { description, model };
 }
 
 export default function (pi: ExtensionAPI) {
@@ -162,13 +174,13 @@ export default function (pi: ExtensionAPI) {
 
       // Non-vision current model: call the vision fallback.
       try {
-        const description = await describeWithVision(base64, mimeType, question ?? "", signal);
+        const { description, model: visionModel } = await describeWithVision(base64, mimeType, question ?? "", signal);
         const header =
           `Viewing image "${absPath}" [${mimeType}, ${buffer.length} bytes].\n` +
-          `Current model cannot read images; description via ${process.env.PI_VISION_MODEL ?? DEFAULT_MODEL}:\n\n`;
+          `Current model cannot read images; description via ${visionModel}:\n\n`;
         return {
           content: [{ type: "text", text: header + description }, imageBlock],
-          details: { mimeType, bytes: buffer.length, source: "vision-fallback" },
+          details: { mimeType, bytes: buffer.length, source: "vision-fallback", visionModel },
         };
       } catch (err: any) {
         return {
@@ -214,7 +226,8 @@ export default function (pi: ExtensionAPI) {
       if (!options.expanded) {
         // Collapsed: hide description text (image still renders inline).
         const src = (result.details as any)?.source;
-        const via = src === "vision-fallback" ? ` via ${process.env.PI_VISION_MODEL ?? DEFAULT_MODEL}` : "";
+        const visionModel = (result.details as any)?.visionModel;
+        const via = src === "vision-fallback" && visionModel ? ` via ${visionModel}` : "";
         text.setText(theme.fg("dim", `loaded${via}`));
         return text;
       }

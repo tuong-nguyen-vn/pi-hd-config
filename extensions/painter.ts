@@ -10,15 +10,16 @@
  *
  * Saves a PNG to disk and renders it inline in the TUI.
  *
- * Configure via env:
- *   HD_PROXY_KEY     (required) — proxy API key
- *   HD_PROXY_URL     (optional, default https://proxy.tuongnguyen.work) — proxy base
- *   PI_PAINTER_MODEL (optional, default gpt-image-2)
- *   PI_PAINTER_BASE  (optional, overrides HD_PROXY_URL)
- *   PI_PAINTER_KEY   (optional, overrides HD_PROXY_KEY)
+ * Configure via ~/.pi/agent/extensions.json (preferred):
+ *   { "painter": { "baseUrl": "...", "apiKey": "...", "model": "..." } }
+ *
+ * Or via env (fallback): PI_PAINTER_BASE / PI_PAINTER_KEY / PI_PAINTER_MODEL
+ * (legacy: HD_PROXY_URL / HD_PROXY_KEY).
  */
 
 import { writeFile, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { basename } from "node:path";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -26,6 +27,17 @@ import { Text } from "@earendil-works/pi-tui";
 
 const DEFAULT_BASE = "https://proxy.tuongnguyen.work/v1";
 const DEFAULT_MODEL = "gpt-image-2";
+
+async function loadExtConfig(section: string): Promise<Record<string, string>> {
+  try {
+    const raw = await readFile(join(homedir(), ".pi", "agent", "extensions.json"), "utf-8");
+    const parsed = JSON.parse(raw);
+    const v = parsed?.[section];
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
 
 const IMAGE_EXT: Record<string, string> = {
   png: "image/png",
@@ -159,10 +171,11 @@ export default function (pi: ExtensionAPI) {
       ),
     }),
     async execute(_toolCallId, args: any, signal, _onUpdate, _ctx) {
-      const base = process.env.PI_PAINTER_BASE ?? process.env.HD_PROXY_URL ?? DEFAULT_BASE;
-      const key = process.env.PI_PAINTER_KEY ?? process.env.HD_PROXY_KEY;
-      if (!key) return errResult("painter: HD_PROXY_KEY env var not set");
-      const model = process.env.PI_PAINTER_MODEL ?? DEFAULT_MODEL;
+      const cfg = await loadExtConfig("painter");
+      const base = cfg.baseUrl || process.env.PI_PAINTER_BASE || process.env.HD_PROXY_URL || DEFAULT_BASE;
+      const key = cfg.apiKey || process.env.PI_PAINTER_KEY || process.env.HD_PROXY_KEY;
+      if (!key) return errResult("painter: no API key — set painter.apiKey in ~/.pi/agent/extensions.json or PI_PAINTER_KEY env");
+      const model = cfg.model || process.env.PI_PAINTER_MODEL || DEFAULT_MODEL;
 
       const prompt = String(args.prompt ?? "").trim();
       if (!prompt) return errResult("painter: `prompt` is required");

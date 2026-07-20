@@ -102,13 +102,14 @@ PI_VISION_BASE_VAL="$(pick_url "Base URL" PI_VISION_BASE "$PI_PAINTER_BASE_VAL")
 PI_VISION_KEY_VAL="$(pick_key  "API key"  PI_VISION_KEY "$PI_PAINTER_KEY_VAL")"
 
 # --- 4. Prepare dirs + copy tooling -------------------------------------------
-mkdir -p "$PI_DIR"/{agents,extensions/subagent}
+mkdir -p "$PI_DIR"/{agents,extensions/subagent,themes}
 info "Copying tooling → $PI_DIR"
 cp "$REPO_DIR/AGENTS.md"                "$PI_DIR/AGENTS.md"
 cp "$REPO_DIR/agents/"*.md              "$PI_DIR/agents/"
 cp "$REPO_DIR/extensions/painter.ts"    "$PI_DIR/extensions/"
 cp "$REPO_DIR/extensions/view-media.ts" "$PI_DIR/extensions/"
 cp "$REPO_DIR/extensions/subagent/"*    "$PI_DIR/extensions/subagent/"
+cp "$REPO_DIR/themes/"*.json            "$PI_DIR/themes/"
 
 # --- 5. Install pi-default-tools package (idempotent) -------------------------
 if pi list 2>/dev/null | grep -q "pi-default-tools"; then
@@ -118,30 +119,42 @@ else
   pi install "$DEFAULT_TOOLS_PKG" || err "  (skipped: pi install failed)"
 fi
 
-# --- 6. Persist per-tool env vars to shell rc ---------------------------------
-if [ "$PI_DIR" = "$HOME/.pi/agent" ]; then
-  write_env_block() {
-    local rc="$1"; [ -f "$rc" ] || return 0
-    local m0="# >>> pi-hd-config >>>"
-    local m1="# <<< pi-hd-config <<<"
-    if grep -qF "$m0" "$rc"; then
-      awk -v s="$m0" -v e="$m1" '$0==s{f=1;next} $0==e{f=0;next} !f' "$rc" > "$rc.tmp" \
-        && mv "$rc.tmp" "$rc"
-    fi
-    cat >> "$rc" <<EOF
+# --- 6. Write extensions.json (config in ~/.pi, not shell rc) -----------------
+EXT_JSON="$PI_DIR/extensions.json"
+write_ext_field() {  # $1=file  $2=section  $3=key  $4=value
+  local file="$1" section="$2" key="$3" val="$4"
+  python3 - "$file" "$section" "$key" "$val" <<'PY'
+import json, os, sys
+file, section, key, val = sys.argv[1:5]
+try:
+    with open(file) as f:
+        data = json.load(f)
+except Exception:
+    data = {}
+data.setdefault(section, {})[key] = val
+os.makedirs(os.path.dirname(file), exist_ok=True)
+with open(file, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+os.chmod(file, 0o600)
+PY
+}
 
-$m0
-export PI_PAINTER_BASE="$PI_PAINTER_BASE_VAL"
-export PI_PAINTER_KEY="$PI_PAINTER_KEY_VAL"
-export PI_VISION_BASE="$PI_VISION_BASE_VAL"
-export PI_VISION_KEY="$PI_VISION_KEY_VAL"
-$m1
-EOF
-  }
-  write_env_block "$HOME/.zshrc"
-  write_env_block "$HOME/.bashrc"
-  ok "Persisted per-tool env vars to ~/.zshrc and ~/.bashrc"
+# Load existing values if present (so re-runs preserve keys)
+EXT_PAINTER_KEY_VAL="$PI_PAINTER_KEY_VAL"
+EXT_VISION_KEY_VAL="$PI_VISION_KEY_VAL"
+if [ -f "$EXT_JSON" ]; then
+  existing_painter_key="$(python3 -c "import json; d=json.load(open('$EXT_JSON')); print(d.get('painter',{}).get('apiKey',''))" 2>/dev/null || true)"
+  existing_vision_key="$(python3 -c "import json; d=json.load(open('$EXT_JSON')); print(d.get('viewMedia',{}).get('apiKey',''))" 2>/dev/null || true)"
+  [ -n "$existing_painter_key" ] && EXT_PAINTER_KEY_VAL="$existing_painter_key"
+  [ -n "$existing_vision_key" ] && EXT_VISION_KEY_VAL="$existing_vision_key"
 fi
+
+write_ext_field "$EXT_JSON" painter baseUrl "$PI_PAINTER_BASE_VAL"
+write_ext_field "$EXT_JSON" painter apiKey  "$EXT_PAINTER_KEY_VAL"
+write_ext_field "$EXT_JSON" viewMedia baseUrl "$PI_VISION_BASE_VAL"
+write_ext_field "$EXT_JSON" viewMedia apiKey  "$EXT_VISION_KEY_VAL"
+ok "Wrote $EXT_JSON (chmod 600)"
 
 # --- 7. Summary ---------------------------------------------------------------
 echo
@@ -149,12 +162,11 @@ ok "Tooling installed:"
 echo "    extensions: painter, view_media, subagent"
 echo "    agents:     oracle (gpt-5.6-sol), search (gemini-3-flash-agent)"
 echo "    package:    pi-default-tools"
+echo "    theme:      amp (Amp-like minimal — set \"theme\": \"amp\" in settings.json)"
+echo "    secrets:    $EXT_JSON (chmod 600)"
 echo
 echo "  $(c_cyan 'Painter')   → $PI_PAINTER_BASE_VAL"
 echo "  $(c_cyan 'View-media') → $PI_VISION_BASE_VAL"
 echo
 echo "  $(c_cyan 'Provider/model setup is yours:') put a models.json with your"
-echo "  providers in $(c_cyan "$PI_DIR/models.json") (see repo for a sample)."
-if [ "$PI_DIR" = "$HOME/.pi/agent" ]; then
-  echo "  Then: $(c_cyan 'source ~/.zshrc') (or new shell) and run $(c_cyan 'pi')"
-fi
+echo "  providers in $(c_cyan "$PI_DIR/models.json") (see repo for a sample), then run $(c_cyan 'pi')"
