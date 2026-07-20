@@ -43,7 +43,9 @@ PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 DEFAULT_BASE_URL="https://proxy.tuongnguyen.work/v1"
 DEFAULT_TOOLS_PKG="git:github.com/jwu/pi-default-tools"
 
-is_tty() { [ -t 0 ] && [ -t 1 ]; }
+# Check stdout TTY only. When piped via `curl | bash`, stdin is the curl pipe
+# but prompts read from /dev/tty directly, so stdin TTY check would be wrong.
+is_tty() { [ -t 1 ]; }
 
 # Read $env_var; else reuse from shell rc; else prompt (TTY) with default;
 # else fall back to default (non-interactive).
@@ -52,7 +54,7 @@ pick_url() {  # $1=label  $2=env_var  $3=default
   local val="${!env_var:-}"
   if [ -n "$val" ]; then echo "${val%/}"; return; fi
   if is_tty; then
-    read -rp "  ${label} [${default}]: " val
+    read -rp "  ${label} [${default}]: " val </dev/tty
     val="${val:-$default}"
   else
     val="$default"
@@ -75,11 +77,11 @@ pick_key() {  # $1=label  $2=env_var  $3=default_or_empty
   fi
   if is_tty; then
     if [ -n "$default" ]; then
-      read -rsp "  ${label} $(c_yellow '[Enter = same as painter]'): " val
+      read -rsp "  ${label} $(c_yellow '[Enter = same as painter]'): " val </dev/tty
       echo
       val="${val:-$default}"
     else
-      read -rsp "  ${label}: " val
+      read -rsp "  ${label}: " val </dev/tty
       echo
     fi
   else
