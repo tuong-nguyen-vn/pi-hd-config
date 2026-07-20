@@ -43,26 +43,38 @@ PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 DEFAULT_BASE_URL="https://proxy.tuongnguyen.work/v1"
 DEFAULT_TOOLS_PKG="git:github.com/jwu/pi-default-tools"
 
-# Check stdout TTY only. When piped via `curl | bash`, stdin is the curl pipe
-# but prompts read from /dev/tty directly, so stdin TTY check would be wrong.
-is_tty() { [ -t 1 ]; }
+# Open /dev/tty on fd 3 for interactive prompts. Works in both direct and
+# `curl | bash` pipe mode (parent re-execs the script with stdin=/dev/tty).
+# Returns 0 if /dev/tty is usable, 1 otherwise (CI/headless).
+open_tty() {
+  if (exec 3</dev/tty 4>/dev/tty) 2>/dev/null; then
+    exec 3</dev/tty 4>/dev/tty 2>/dev/null
+    return 0
+  fi
+  return 1
+}
+close_tty() { exec 3<&- 4>&- 2>/dev/null || true; }
 
-# Read $env_var; else reuse from shell rc; else prompt (TTY) with default;
-# else fall back to default (non-interactive).
+# Read $env_var; else reuse from shell rc; else prompt on /dev/tty;
+# else fall back to default.
 pick_url() {  # $1=label  $2=env_var  $3=default
   local label="$1" env_var="$2" default="${3:-}"
   local val="${!env_var:-}"
   if [ -n "$val" ]; then echo "${val%/}"; return; fi
-  if is_tty; then
-    read -rp "  ${label} [${default}]: " val </dev/tty
-    val="${val:-$default}"
+  if open_tty; then
+    printf "  ${label} [${default}]: " >&4
+    local input=""
+    read -r input <&3 || true
+    printf "\n" >&4
+    close_tty
+    val="${input:-$default}"
   else
     val="$default"
   fi
   echo "${val%/}"
 }
 
-# Read $env_var; else reuse from shell rc; else prompt (TTY); else $3 default.
+# Read $env_var; else reuse from shell rc; else prompt on /dev/tty; else $3 default.
 # Empty + no default → abort (required).
 pick_key() {  # $1=label  $2=env_var  $3=default_or_empty
   local label="$1" env_var="$2" default="${3:-}"
@@ -75,19 +87,20 @@ pick_key() {  # $1=label  $2=env_var  $3=default_or_empty
     info "Reusing existing $env_var from shell rc."
     echo "$existing"; return
   fi
-  if is_tty; then
+  if open_tty; then
     if [ -n "$default" ]; then
-      read -rsp "  ${label} $(c_yellow '[Enter = same as painter]'): " val </dev/tty
-      echo
-      val="${val:-$default}"
+      printf "  ${label} $(c_yellow '[Enter = same as painter]'): " >&4
     else
-      read -rsp "  ${label}: " val </dev/tty
-      echo
+      printf "  ${label}: " >&4
     fi
+    local input=""
+    read -rs input <&3 || true
+    printf "\n" >&4
+    close_tty
+    val="${input:-$default}"
   else
     val="$default"
   fi
-  # Required-key check (also covers non-interactive with no env + no default)
   if [ -z "$val" ]; then
     err "$env_var is required. Set it via: $env_var=... ./install.sh"
     exit 1
