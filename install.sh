@@ -103,6 +103,19 @@ DEFAULT_MODEL="$(pick_default_model)"
 THEME="$(pick_theme)"
 THINKING="$(pick_thinking)"
 
+# --- 2c. Proxy URL ------------------------------------------------------------
+pick_proxy_url() {
+  [ -n "${HD_PROXY_URL:-}" ] && { echo "$HD_PROXY_URL"; return; }
+  is_tty || { echo "https://proxy.tuongnguyen.work"; return; }
+  local url
+  read -rp "Proxy base URL [https://proxy.tuongnguyen.work]: " url
+  # strip trailing slash
+  url="${url%/}"
+  echo "${url:-https://proxy.tuongnguyen.work}"
+}
+PROXY_URL="$(pick_proxy_url)"
+DEFAULT_PROXY_URL="https://proxy.tuongnguyen.work"
+
 # Map model id → provider (settings.json needs both defaultProvider & defaultModel)
 provider_for_model() {
   case "$1" in
@@ -140,6 +153,20 @@ json.dump(d, open(path, "w"), indent=2, ensure_ascii=False)
 PY
 ok "Defaults: $DEFAULT_PROVIDER/$DEFAULT_MODEL · theme=$THEME · thinking=$THINKING"
 
+# Patch models.json + extensions with chosen proxy URL
+if [ "$PROXY_URL" != "$DEFAULT_PROXY_URL" ]; then
+  info "Substituting proxy URL → $PROXY_URL"
+  python3 - "$PI_DIR/models.json" "$PI_DIR/extensions/painter.ts" "$PI_DIR/extensions/view-media.ts" \
+    "$DEFAULT_PROXY_URL" "$PROXY_URL" <<'PY'
+import sys
+default, chosen = sys.argv[-2], sys.argv[-1]
+for path in sys.argv[1:-2]:
+    s = open(path).read()
+    s = s.replace(default, chosen)
+    open(path, "w").write(s)
+PY
+fi
+
 # --- 5. Persist HD_PROXY_KEY to shell rc --------------------------------------
 # Only persist when installing into the real user dir (skip for test dirs).
 if [ "$PI_DIR" = "$HOME/.pi/agent" ]; then
@@ -154,6 +181,7 @@ if [ "$PI_DIR" = "$HOME/.pi/agent" ]; then
 
 $m0
 export $KEY_ENV="$KEY"
+export HD_PROXY_URL="$PROXY_URL"
 $m1
 EOF
   }
@@ -163,6 +191,7 @@ EOF
 fi
 # Export for this process so verification works
 export "$KEY_ENV=$KEY"
+export "HD_PROXY_URL=$PROXY_URL"
 
 # --- 6. Fetch the pi-default-tools package ------------------------------------
 info "Fetching pi-default-tools package..."

@@ -10,8 +10,9 @@
  *
  * Configure via env:
  *   HD_PROXY_KEY     (required) — proxy API key
+ *   HD_PROXY_URL     (optional, default https://proxy.tuongnguyen.work) — proxy base
  *   PI_VISION_MODEL  (optional, default gemini-3-flash-agent)
- *   PI_VISION_BASE   (optional, default https://proxy.tuongnguyen.work/v1)
+ *   PI_VISION_BASE   (optional, overrides HD_PROXY_URL)
  *   PI_VISION_KEY    (optional, overrides HD_PROXY_KEY)
  */
 
@@ -48,7 +49,7 @@ async function describeWithVision(
   question: string,
   signal: AbortSignal | undefined,
 ): Promise<string> {
-  const base = process.env.PI_VISION_BASE ?? DEFAULT_BASE;
+  const base = process.env.PI_VISION_BASE ?? process.env.HD_PROXY_URL ?? DEFAULT_BASE;
   const key = process.env.PI_VISION_KEY ?? process.env.HD_PROXY_KEY;
   if (!key) throw new Error("view_media: HD_PROXY_KEY env var not set");
   const model = process.env.PI_VISION_MODEL ?? DEFAULT_MODEL;

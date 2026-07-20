@@ -70,6 +70,10 @@ Default: `hd-claude` / `claude-sonnet-5` (override in `settings.json`).
 | Var | Required | Purpose |
 |---|---|---|
 | `HD_PROXY_KEY` | yes | Proxy API key (set by install.sh) |
+| `HD_PROXY_URL` | no | Proxy base URL (default `https://proxy.tuongnguyen.work`, set by install.sh) |
+| `PI_DEFAULT_MODEL` | no | Default model id (interactive prompt otherwise) |
+| `PI_THEME` | no | `dark` / `light` (interactive prompt otherwise) |
+| `PI_THINKING` | no | Default thinking level (interactive prompt otherwise) |
 | `PI_PAINTER_MODEL` | no | Override `gpt-image-2` |
 | `PI_PAINTER_BASE` | no | Override image API base URL |
 | `PI_VISION_MODEL` | no | Override `gemini-3-flash-agent` fallback |

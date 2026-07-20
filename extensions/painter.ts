@@ -12,8 +12,9 @@
  *
  * Configure via env:
  *   HD_PROXY_KEY     (required) — proxy API key
+ *   HD_PROXY_URL     (optional, default https://proxy.tuongnguyen.work) — proxy base
  *   PI_PAINTER_MODEL (optional, default gpt-image-2)
- *   PI_PAINTER_BASE  (optional, default https://proxy.tuongnguyen.work/v1)
+ *   PI_PAINTER_BASE  (optional, overrides HD_PROXY_URL)
  *   PI_PAINTER_KEY   (optional, overrides HD_PROXY_KEY)
  */
 
@@ -158,7 +159,7 @@ export default function (pi: ExtensionAPI) {
       ),
     }),
     async execute(_toolCallId, args: any, signal, _onUpdate, _ctx) {
-      const base = process.env.PI_PAINTER_BASE ?? DEFAULT_BASE;
+      const base = process.env.PI_PAINTER_BASE ?? process.env.HD_PROXY_URL ?? DEFAULT_BASE;
       const key = process.env.PI_PAINTER_KEY ?? process.env.HD_PROXY_KEY;
       if (!key) return errResult("painter: HD_PROXY_KEY env var not set");
       const model = process.env.PI_PAINTER_MODEL ?? DEFAULT_MODEL;
