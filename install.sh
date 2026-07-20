@@ -18,11 +18,7 @@
 #   PI_CODING_AGENT_DIR=/tmp/x ./install.sh      # alt target dir
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
-DEFAULT_BASE_URL="https://proxy.tuongnguyen.work/v1"
-DEFAULT_TOOLS_PKG="git:github.com/jwu/pi-default-tools"
-
+# Helpers (defined early so piped-install branch can use them)
 c_red()   { printf "\033[31m%s\033[0m" "$*"; }
 c_green() { printf "\033[32m%s\033[0m" "$*"; }
 c_cyan()  { printf "\033[36m%s\033[0m" "$*"; }
@@ -30,6 +26,22 @@ c_yellow(){ printf "\033[33m%s\033[0m" "$*"; }
 err()  { printf "%s %s\n" "$(c_red '✗')" "$*" >&2; }
 ok()   { printf "%s %s\n" "$(c_green '✓')" "$*"; }
 info() { printf "%s %s\n" "$(c_cyan '→')" "$*"; }
+
+# Support `curl ... | bash`: when piped, BASH_SOURCE is empty/unset and there's
+# no script dir to read themes/extensions from. Clone to a temp dir and re-exec
+# from there with stdin wired to /dev/tty so interactive prompts still work.
+if [ -z "${BASH_SOURCE[0]:-}" ] || [ ! -f "${BASH_SOURCE[0]:-}" ]; then
+  TMP_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TMP_DIR"' EXIT
+  info "Piped install — cloning repo to $TMP_DIR"
+  git clone --depth 1 https://github.com/tuong-nguyen-vn/pi-hd-config.git "$TMP_DIR" >&2
+  exec bash "$TMP_DIR/install.sh" "$@" </dev/tty
+fi
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+DEFAULT_BASE_URL="https://proxy.tuongnguyen.work/v1"
+DEFAULT_TOOLS_PKG="git:github.com/jwu/pi-default-tools"
 
 is_tty() { [ -t 0 ] && [ -t 1 ]; }
 
