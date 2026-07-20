@@ -51,6 +51,69 @@ get_key() {
 }
 KEY="$(get_key)"
 
+# --- 2b. Personalize (interactive only — skip if env vars pre-set) ------------
+# Each can be pre-set via env to keep install fully non-interactive.
+is_tty() { [ -t 0 ] && [ -t 1 ]; }
+
+pick_default_model() {
+  [ -n "${PI_DEFAULT_MODEL:-}" ] && { echo "$PI_DEFAULT_MODEL"; return; }
+  is_tty || { echo "claude-sonnet-5"; return; }
+  cat <<'EOF'
+
+Pick a default model (provider/model):
+  1) claude-sonnet-5       (hd-claude, recommended)
+  2) glm-5.2               (hd-claude, cheapest)
+  3) claude-opus-4-8       (hd-claude, strongest)
+  4) gpt-5.6-sol           (hd-openai)
+  5) gpt-5.5               (hd-openai)
+  6) grok-4.5              (hd-openai)
+  7) gemini-3-flash-agent  (hd-gemini)
+EOF
+  local choice
+  read -rp "Choice [1]: " choice
+  case "${choice:-1}" in
+    1) echo "claude-sonnet-5" ;;
+    2) echo "glm-5.2" ;;
+    3) echo "claude-opus-4-8" ;;
+    4) echo "gpt-5.6-sol" ;;
+    5) echo "gpt-5.5" ;;
+    6) echo "grok-4.5" ;;
+    7) echo "gemini-3-flash-agent" ;;
+    *) echo "claude-sonnet-5" ;;
+  esac
+}
+
+pick_theme() {
+  [ -n "${PI_THEME:-}" ] && { echo "$PI_THEME"; return; }
+  is_tty || { echo "dark"; return; }
+  local choice
+  read -rp "Theme — 1) dark (default)  2) light  [1]: " choice
+  case "${choice:-1}" in 2) echo "light" ;; *) echo "dark" ;; esac
+}
+
+pick_thinking() {
+  [ -n "${PI_THINKING:-}" ] && { echo "$PI_THINKING"; return; }
+  is_tty || { echo "medium"; return; }
+  local choice
+  read -rp "Default thinking — 1) off  2) low  3) medium (default)  4) high  [3]: " choice
+  case "${choice:-3}" in 1) echo "off" ;; 2) echo "low" ;; 4) echo "high" ;; *) echo "medium" ;; esac
+}
+
+DEFAULT_MODEL="$(pick_default_model)"
+THEME="$(pick_theme)"
+THINKING="$(pick_thinking)"
+
+# Map model id → provider (settings.json needs both defaultProvider & defaultModel)
+provider_for_model() {
+  case "$1" in
+    claude-*|glm-*) echo "hd-claude" ;;
+    gpt-*|grok-*)   echo "hd-openai" ;;
+    gemini-*)       echo "hd-gemini" ;;
+    *)              echo "hd-claude" ;;
+  esac
+}
+DEFAULT_PROVIDER="$(provider_for_model "$DEFAULT_MODEL")"
+
 # --- 3. Prepare target dirs ---------------------------------------------------
 mkdir -p "$PI_DIR"/{agents,extensions/subagent,prompts,sessions}
 
@@ -63,6 +126,19 @@ cp "$REPO_DIR/agents/"*.md              "$PI_DIR/agents/"
 cp "$REPO_DIR/extensions/painter.ts"    "$PI_DIR/extensions/"
 cp "$REPO_DIR/extensions/view-media.ts" "$PI_DIR/extensions/"
 cp "$REPO_DIR/extensions/subagent/"*    "$PI_DIR/extensions/subagent/"
+
+# Apply interactive choices to settings.json
+python3 - "$PI_DIR/settings.json" "$DEFAULT_PROVIDER" "$DEFAULT_MODEL" "$THEME" "$THINKING" <<'PY'
+import json, sys
+path, prov, model, theme, thinking = sys.argv[1:6]
+d = json.load(open(path))
+d["defaultProvider"]      = prov
+d["defaultModel"]         = model
+d["theme"]                = theme
+d["defaultThinkingLevel"] = thinking
+json.dump(d, open(path, "w"), indent=2, ensure_ascii=False)
+PY
+ok "Defaults: $DEFAULT_PROVIDER/$DEFAULT_MODEL · theme=$THEME · thinking=$THINKING"
 
 # --- 5. Persist HD_PROXY_KEY to shell rc --------------------------------------
 # Only persist when installing into the real user dir (skip for test dirs).
@@ -93,8 +169,8 @@ info "Fetching pi-default-tools package..."
 pi update pi-default-tools >/dev/null 2>&1 || pi update >/dev/null 2>&1 || true
 
 # --- 7. Verify ----------------------------------------------------------------
-info "Verifying: calling glm-5.2 via the new config..."
-if pi -p --provider hd-claude --model glm-5.2 --no-tools --thinking off "reply with exactly: ok" 2>&1 | tail -3 | grep -q "ok"; then
+info "Verifying: calling $DEFAULT_MODEL via $DEFAULT_PROVIDER..."
+if pi -p --provider "$DEFAULT_PROVIDER" --model "$DEFAULT_MODEL" --no-tools --thinking off "reply with exactly: ok" 2>&1 | tail -3 | grep -q "ok"; then
   ok "Install successful."
   echo
   echo "  Next: $(c_cyan 'source ~/.zshrc')  (or open a new shell)"

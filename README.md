@@ -21,14 +21,23 @@ curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/in
 The script:
 1. Installs `@earendil-works/pi-coding-agent` via npm if `pi` isn't on PATH.
 2. Prompts for the HD proxy API key (or reads `HD_PROXY_KEY` env var).
-3. Copies `models.json`, `settings.json`, `agents/`, `extensions/`, `AGENTS.md`
-   into `~/.pi/agent/`.
-4. Persists `export HD_PROXY_KEY="..."` to `~/.zshrc` and `~/.bashrc`.
-5. Verifies with a live call to `glm-5.2`.
+3. Prompts for **default model**, **theme**, **thinking level** (or reads
+   `PI_DEFAULT_MODEL` / `PI_THEME` / `PI_THINKING` env vars; defaults apply
+   when stdin isn't a TTY).
+4. Copies `models.json`, `settings.json`, `agents/`, `extensions/`, `AGENTS.md`
+   into `~/.pi/agent/`, patching `settings.json` with your choices.
+5. Persists `export HD_PROXY_KEY="..."` to `~/.zshrc` and `~/.bashrc`.
+6. Verifies with a live call to your chosen default model.
 
-Non-interactive:
+Non-interactive (all defaults):
 ```bash
 HD_PROXY_KEY=... curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/install.sh | bash
+```
+
+Non-interactive (specific defaults):
+```bash
+HD_PROXY_KEY=... PI_DEFAULT_MODEL=gpt-5.6-sol PI_THEME=dark PI_THINKING=high \
+  bash install.sh
 ```
 
 Or from a clone:
