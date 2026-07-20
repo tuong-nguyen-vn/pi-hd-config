@@ -1,16 +1,27 @@
 # pi-hd-config
 
-Bootstrap config for [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
-against the HD proxy at `https://proxy.tuongnguyen.work`.
+Tooling pack for [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent):
+extensions, subagents, and a tools package. **Provider/model config is yours
+to manage** — this installer only handles the tooling layer.
 
-Sets up:
-- **3 providers** (`hd-claude` / `hd-openai` / `hd-gemini`) on their native
-  API standards (Anthropic Messages / OpenAI Chat Completions / Google
-  Generative AI) with current per-token pricing.
-- **Extensions**: `painter` (text→image generate/edit), `view-media` (vision),
-  `subagent` (delegate to `search`/`oracle`).
-- **Agents**: `oracle` (deep reasoning), `search` (parallel code search).
-- `AGENTS.md` wiring subagent delegation into the system prompt.
+## What gets installed
+
+| Layer | What | Where |
+|---|---|---|
+| Extensions | `painter` (image gen/edit), `view_media` (vision), `subagent` | `~/.pi/agent/extensions/` |
+| Agents | `oracle` (deep reasoning, `gpt-5.6-sol`), `search` (parallel code search, `gemini-3-flash-agent`) | `~/.pi/agent/agents/` |
+| System prompt | `AGENTS.md` wiring subagent delegation | `~/.pi/agent/AGENTS.md` |
+| Package | `pi-default-tools` (via `pi install`) | settings.json `packages` + `~/.pi/agent/git/` |
+
+**Not touched** by the installer (you manage these):
+- `models.json` (providers, API keys, model definitions)
+- `settings.json` (default model, theme, thinking level, …)
+
+A sample `models.json` + `settings.json` live in this repo for reference —
+copy them manually if you want a starting point:
+```bash
+cp models.json settings.json ~/.pi/agent/
+```
 
 ## One-line install
 
@@ -20,63 +31,37 @@ curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/in
 
 The script:
 1. Installs `@earendil-works/pi-coding-agent` via npm if `pi` isn't on PATH.
-2. Prompts for the HD proxy API key (or reads `HD_PROXY_KEY` env var).
-3. Prompts for **proxy base URL**, **theme**, **thinking level** (or reads
-   `HD_PROXY_URL` / `PI_THEME` / `PI_THINKING` env vars; defaults apply when
-   stdin isn't a TTY). The default model is intentionally left untouched —
-   pick it yourself via `/model` or `/settings` after first run.
-4. Copies `models.json`, `settings.json`, `agents/`, `extensions/`, `AGENTS.md`
-   into `~/.pi/agent/`, patching `settings.json` with your theme/thinking.
-5. Persists `export HD_PROXY_KEY=...` and `export HD_PROXY_URL=...` to
-   `~/.zshrc` and `~/.bashrc`.
-6. Verifies with a live call to `glm-5.2` (cheapest).
+2. Prompts for **HD_PROXY_KEY** (used by `painter` + `view_media`) — or reads
+   the env var.
+3. Prompts for **HD_PROXY_URL** (default `https://proxy.tuongnguyen.work`) —
+   or reads the env var.
+4. Copies extensions, agents, and `AGENTS.md` into `~/.pi/agent/`.
+5. `pi install git:github.com/jwu/pi-default-tools` (skipped if present).
+6. Persists `HD_PROXY_KEY` + `HD_PROXY_URL` to `~/.zshrc` / `~/.bashrc`.
 
-Non-interactive (all defaults):
-```bash
-HD_PROXY_KEY=... curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/install.sh | bash
-```
+That's the entire input set — no theme/thinking/model prompts. Those are
+personal prefs you set via `/settings` and `/model` inside Pi.
 
-Non-interactive (specific options):
+Non-interactive:
 ```bash
-HD_PROXY_KEY=... HD_PROXY_URL=https://my.proxy PI_THEME=dark PI_THINKING=high \
-  bash install.sh
+HD_PROXY_KEY=... HD_PROXY_URL=https://my.proxy \
+  curl -sSL https://raw.githubusercontent.com/tuong-nguyen-vn/pi-hd-config/main/install.sh | bash
 ```
 
 Or from a clone:
 ```bash
 git clone https://github.com/tuong-nguyen-vn/pi-hd-config.git
-cd REPO
-./install.sh
+cd pi-hd-config && ./install.sh
 ```
-
-## Models available after install
-
-| Provider | Model | API |
-|---|---|---|
-| hd-claude | claude-opus-4-8, claude-sonnet-5, glm-5.2 | anthropic-messages |
-| hd-openai | gpt-5.5, gpt-5.6-sol, grok-4.5, grok-composer-2.5-fast | openai-completions |
-| hd-gemini | gemini-3-flash-agent | google-generative-ai |
-
-Default: `hd-claude` / `claude-sonnet-5` (override in `settings.json`).
-
-## Tools
-
-| Tool | Source | Purpose |
-|---|---|---|
-| `painter` | extensions/painter.ts | Generate/edit images via gpt-image-2 |
-| `view_media` | extensions/view-media.ts | Read image files; vision fallback |
-| `subagent` | extensions/subagent/ | Delegate to `search`/`oracle` |
 
 ## Environment variables
 
 | Var | Required | Purpose |
 |---|---|---|
-| `HD_PROXY_KEY` | yes | Proxy API key (set by install.sh) |
-| `HD_PROXY_URL` | no | Proxy base URL (default `https://proxy.tuongnguyen.work`, set by install.sh) |
-| `PI_THEME` | no | `dark` / `light` (interactive prompt otherwise) |
-| `PI_THINKING` | no | Default thinking level (interactive prompt otherwise) |
+| `HD_PROXY_KEY` | yes (for painter/view_media) | Proxy API key — set by install.sh |
+| `HD_PROXY_URL` | no | Proxy base URL (default `https://proxy.tuongnguyen.work`) — set by install.sh |
 | `PI_PAINTER_MODEL` | no | Override `gpt-image-2` |
-| `PI_PAINTER_BASE` | no | Override image API base URL |
+| `PI_PAINTER_BASE` | no | Override painter API base URL |
 | `PI_VISION_MODEL` | no | Override `gemini-3-flash-agent` fallback |
 | `PI_VISION_BASE` | no | Override vision API base URL |
 
@@ -86,21 +71,25 @@ Default: `hd-claude` / `claude-sonnet-5` (override in `settings.json`).
 ./uninstall.sh
 ```
 
-Removes copied resources + the env block from shell rc files. Keeps
-`auth.json`, `sessions/`, `models-store.json`, `bin/`, `trust.json`.
+Removes extensions + agents + AGENTS.md + the env block from shell rc files.
+Keeps `models.json`, `settings.json`, `auth.json`, `sessions/`, `bin/`,
+`trust.json`, `models-store.json`. To also drop the tools package:
+```bash
+pi remove git:github.com/jwu/pi-default-tools
+```
 
 ## Repo contents
 
 ```
 .
-├── install.sh           # one-command installer
+├── install.sh           # tooling installer (NO provider/model setup)
 ├── uninstall.sh
-├── models.json          # providers w/ ${HD_PROXY_KEY} interpolation
-├── settings.json        # defaults: hd-claude / claude-sonnet-5
+├── models.json          # SAMPLE providers config (copy manually if wanted)
+├── settings.json        # SAMPLE settings (copy manually if wanted)
 ├── AGENTS.md            # subagent delegation wiring
 ├── agents/
 │   ├── oracle.md        # deep-reasoning subagent (gpt-5.6-sol)
-│   └── search.md        # parallel code-search subagent (grok-composer-2.5-fast)
+│   └── search.md        # parallel code-search subagent (gemini-3-flash-agent)
 ├── extensions/
 │   ├── painter.ts
 │   ├── view-media.ts
@@ -110,8 +99,6 @@ Removes copied resources + the env block from shell rc files. Keeps
 
 ## Security
 
-No API keys are committed. `models.json` uses `${HD_PROXY_KEY}` env
-interpolation (Pi's native mechanism), and extensions read
-`process.env.HD_PROXY_KEY`. The installer writes the key to `~/.zshrc` /
-`~/.bashrc` only (file mode kept as your shell default — consider
+No API keys committed. Extensions read `process.env.HD_PROXY_KEY`; the
+installer writes the key only to `~/.zshrc` / `~/.bashrc` (consider
 `chmod 600 ~/.zshrc`).

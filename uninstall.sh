@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Remove pi-hd-config resources from ~/.pi/agent.
-# Does NOT delete: auth.json, sessions/, trust.json, models-store.json, bin/.
+# Remove pi-hd-config tooling from ~/.pi/agent.
+# Does NOT remove: models.json, settings.json, auth.json, sessions/, bin/,
+# trust.json, models-store.json — those are user-owned.
 set -euo pipefail
 PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 
-echo "Removing pi-hd-config resources from $PI_DIR ..."
-rm -f "$PI_DIR/models.json" \
-      "$PI_DIR/settings.json" \
-      "$PI_DIR/AGENTS.md" \
+echo "Removing pi-hd-config tooling from $PI_DIR ..."
+rm -f "$PI_DIR/AGENTS.md" \
       "$PI_DIR/agents/oracle.md" \
       "$PI_DIR/agents/search.md" \
       "$PI_DIR/extensions/painter.ts" \
@@ -24,4 +23,5 @@ for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
   fi
 done
 
-echo "Done. (Kept: auth.json, sessions/, models-store.json, bin/, trust.json)"
+echo "Done. (Kept: models.json, settings.json, auth.json, sessions/, bin/, etc.)"
+echo "  To also remove the pi-default-tools package: pi remove git:github.com/jwu/pi-default-tools"

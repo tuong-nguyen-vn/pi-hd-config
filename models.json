@@ -3,7 +3,7 @@
     "hd-claude": {
       "baseUrl": "https://proxy.tuongnguyen.work",
       "api": "anthropic-messages",
-      "apiKey": "${HD_PROXY_KEY}",
+      "apiKey": "${API_KEY}",
       "models": [
         {
           "id": "claude-opus-4-8",
@@ -75,7 +75,7 @@
     "hd-openai": {
       "baseUrl": "https://proxy.tuongnguyen.work/v1",
       "api": "openai-completions",
-      "apiKey": "${HD_PROXY_KEY}",
+      "apiKey": "${API_KEY}",
       "authHeader": true,
       "compat": {
         "supportsDeveloperRole": false,
